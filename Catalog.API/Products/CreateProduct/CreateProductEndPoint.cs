@@ -5,7 +5,7 @@ namespace Catalog.API.Products.CreateProduct
     internal record CreateProductRequest(string Name, string Description, decimal Price, string ImageFile, List<string> Category);
 
     internal record CreateProductResponse(Guid Id);
-    public class CreateProductEndPoint : ICarterModule
+    public class UpdateProductEndPoint : ICarterModule
     {
         public void AddRoutes(IEndpointRouteBuilder app)
         {
