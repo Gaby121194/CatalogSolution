@@ -1,5 +1,7 @@
 ﻿
 
+using FluentValidation;
+
 namespace Catalog.API.Products.CreateProduct
 {
 
@@ -7,10 +9,30 @@ namespace Catalog.API.Products.CreateProduct
         : ICommand<CreateProductResult>;
 
     public record CreateProductResult(Guid Id);
-    public class GetProductByIdHandler(IDocumentSession session) : ICommandHandler<CreateProductCommand, CreateProductResult>
+
+    public class CreateProductCommandValidator : AbstractValidator<CreateProductCommand>
     {
-        public async Task<CreateProductResult> Handle(CreateProductCommand command, CancellationToken cancellationToken)
+        public CreateProductCommandValidator()
         {
+            RuleFor(x => x.Name).NotEmpty().WithMessage("Name is required");
+            RuleFor(x => x.Description).NotEmpty().WithMessage("Description is required");
+            RuleFor(x => x.Price).GreaterThan(0).WithMessage("Price must be grater than 0");
+            RuleFor(x => x.ImageFile).NotEmpty().WithMessage("ImageFile is required");
+            RuleFor(x => x.Category).NotEmpty().WithMessage("Category is required"); ;
+        }
+    }   
+    public class GetProductByIdHandler(IDocumentSession session,
+        IValidator<CreateProductCommand> validator) : ICommandHandler<CreateProductCommand, CreateProductResult>
+    {
+        public async Task<CreateProductResult> Handle(CreateProductCommand command, 
+            CancellationToken cancellationToken)
+        {
+            var valid = await validator.ValidateAsync(command, cancellationToken);
+            var errors = valid.Errors.Select(x => x.ErrorMessage);
+            if (errors.Any())
+            {
+                throw new ValidationException(errors.FirstOrDefault());
+            }
             //create Product entity from command object
             var product = new Product()
             {
