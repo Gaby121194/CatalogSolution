@@ -1,29 +1,88 @@
-﻿using Grpc.Core;
+﻿using Discount.gRPC.Models;
+using Grpc.Core;
+using Mapster;
+using Microsoft.EntityFrameworkCore;
 
 namespace Discount.gRPC.Services
 {
-    public class DiscountService : DiscountProto.DiscountProtoBase
+    public class DiscountService(DiscountContext dbContext, ILogger<DiscountService> logger) : DiscountProto.DiscountProtoBase
     {
-        public DiscountService() { }
 
-        public override Task<CouponModel> GetDiscount(GetDiscountRequest request, ServerCallContext context)
+        public override async Task<CouponModel> GetDiscount(GetDiscountRequest request, ServerCallContext context)
         {
-           return base.GetDiscount(request, context);
+            var coupon = await dbContext
+              .Coupons
+              .FirstOrDefaultAsync(x => x.ProductName == request.ProducName);
+
+            if (coupon is null)
+                coupon = new Coupon { ProductName = "No Discount", Amount = 0, Description = "No Discount Desc" };
+
+            logger.LogInformation("Discount is retrieved for ProductName : {productName}, Amount : {amount}", coupon.ProductName, coupon.Amount);
+
+            var couponModel = coupon.Adapt<CouponModel>();
+            return couponModel;
+
         }
 
-        public override Task<DeleteDiscountResponse> DeleteDiscount(DeleteDiscountRequest request, ServerCallContext context)
+        public override async Task<DeleteDiscountResponse> DeleteDiscount(DeleteDiscountRequest request, ServerCallContext context)
         {
-            return base.DeleteDiscount(request, context);
+            var response = new DeleteDiscountResponse();
+
+            var coupon = await dbContext
+             .Coupons
+             .FirstOrDefaultAsync(x => x.ProductName == request.ProductName);
+
+            if (coupon is null)
+                throw new RpcException(new Status(StatusCode.NotFound, $"Discount with ProductName={request.ProductName} is not found."));
+
+
+            dbContext.Coupons.Remove(coupon);
+            await dbContext.SaveChangesAsync();
+
+            logger.LogInformation("Discount is successfully deleted. ProductName : {ProductName}", request.ProductName);
+
+
+            response.Success = true;
+            return response;
         }
 
-        public override Task<CouponModel> CreateDiscount(CreateDiscountRequest request, ServerCallContext context)
+        public override async Task<CouponModel> CreateDiscount(CreateDiscountRequest request, ServerCallContext context)
         {
-            return base.CreateDiscount(request, context);
+            try
+            {
+                var coupon = request.Coupon.Adapt<Coupon>();
+                if (coupon is null)
+                    throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid request object."));
+
+                dbContext.Coupons.Add(coupon);
+                await dbContext.SaveChangesAsync();
+
+                logger.LogInformation("Discount is successfully created. ProductName : {ProductName}", coupon.ProductName);
+
+                var couponModel = coupon.Adapt<CouponModel>();
+                return couponModel;
+            }
+            catch (Exception ex)
+            {
+
+                throw;
+            }
+           
         }
 
-        public override Task<CouponModel> UpdateDiscount(UpdateDiscountRequest request, ServerCallContext context)
+        public override async Task<CouponModel> UpdateDiscount(UpdateDiscountRequest request, ServerCallContext context)
         {
-            return base.UpdateDiscount(request, context);
+            var coupon = request.Coupon.Adapt<Coupon>();
+            if (coupon is null)
+                throw new RpcException(new Status(StatusCode.InvalidArgument, "Invalid request object."));
+
+            dbContext.Coupons.Update(coupon);
+            await dbContext.SaveChangesAsync();
+
+            logger.LogInformation("Discount is successfully updated. ProductName : {ProductName}", coupon.ProductName);
+
+            var couponModel = coupon.Adapt<CouponModel>();
+            return couponModel;
         }
     }
 }
