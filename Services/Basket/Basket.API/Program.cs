@@ -1,9 +1,11 @@
 
 
 using Basket.API.Database;
+using Discount.gRPC;
 
 var builder = WebApplication.CreateBuilder(args);
 
+//Application services
 builder.Services.AddCarter();
 builder.Services.AddMediatR(config =>
 {
@@ -13,6 +15,7 @@ builder.Services.AddMediatR(config =>
 }
 );
 
+//Data Services
 builder.Services.AddMarten(options =>
 {
     options.Connection(builder.Configuration.GetConnectionString("Database"));
@@ -28,6 +31,13 @@ builder.Services.AddStackExchangeRedisCache(options =>
     options.Configuration = builder.Configuration.GetConnectionString("Redis");
 });
 
+//gRPC Services
+builder.Services.AddGrpcClient<DiscountProto.DiscountProtoClient>(options =>
+{
+    options.Address = new Uri(builder.Configuration["GrpcSettings:DiscountUrl"]);
+});
+
+//Cross-cutting services
 builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
 
 builder.Services.AddExceptionHandler<CustomExceptionHandler>();
